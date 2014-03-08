@@ -5,8 +5,8 @@ CC= g++
 
 #CFLAGS= -g
 CFLAGS=
-xyzCrawler:$(objects)
-	$(CC) $(CFLAGS) -o xyzCrawler  $(objects) -lpthread
+zhihuCrawler:$(objects)
+	$(CC) $(CFLAGS) -o zhihuCrawler  $(objects) -lpthread
 	
 CMd5.o: CMd5.cc CMd5.h
 	$(CC) $(CFLAGS) -c CMd5.cc
@@ -33,4 +33,4 @@ XUrl.o: XUrl.cc XUrl.h
 
 .PHONY:clean
 clean:	
-	-rm xyzCrawler $(objects)
+	-rm zhihuCrawler $(objects)

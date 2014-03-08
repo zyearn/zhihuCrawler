@@ -20,7 +20,10 @@
  * @version 0.0.0
  * @author zouxin ( zouxin2008@gmail.com )
  * @date 11/3/2008 0.0.0 created, by zouxin
+ *
+ * @modified on 3/6/2014, by zjs
  */
+
 #include "XCrawler.h"
 #include "XUrl.h"
 #include "config.h"
@@ -63,6 +66,7 @@ ThreadMutex mutex_unvisitedUrl[MAX_CRAWLER_DEEP];
 ThreadMutex mutex_visitedUrl;
 ThreadMutex mutex_unreachable_host;
 ThreadMutex mutex_processlink;
+ThreadMutex mutex_pagenum;
 //
 DNSManager dnsMana;
 //
@@ -261,7 +265,12 @@ void XCrawler::fetch()
 				//cout<<page.getBody()<<endl;//test
 
 				//the MAX_DEEP's page need not to get links
-				
+		        
+                m_rawfile.doSearch(page);
+                mutex_pagenum.lock();
+				pageNum++;
+                mutex_pagenum.unlock();
+
                 if(i<MAX_CRAWLER_DEEP-1)
 				{
                     XPage fer_page;
@@ -269,9 +278,9 @@ void XCrawler::fetch()
                     if (fer_http.download(url + "/followers", fer_page) != 0)
                     {
                         cerr << "download follower error\n" << std::endl;
-                        continue;
                     }
-					links = fer_page.getLinks();
+                    else
+                        links = fer_page.getLinks();
                     
 					if(!links.empty())
 						addUrl(url,links,i);
@@ -282,9 +291,9 @@ void XCrawler::fetch()
                     if (fee_http.download(url + "/followees", fee_page) != 0)
                     {
                         cerr << "download followee error\n" << std::endl;
-                        continue;
                     }
-					links = fee_page.getLinks();
+                    else
+                        links = fee_page.getLinks();
                     
 					if(!links.empty())
 						addUrl(url,links,i);
@@ -304,10 +313,9 @@ void XCrawler::fetch()
 				mutex_visitedUrl.unlock();
 				//cout<<"add MD5: "<<url_md5.ToString()<<endl;
 				pageNum++;*/
-				pageNum++;
+				//pageNum++;
 				//
 				//m_rawfile.write(page);
-                m_rawfile.doSearch(page);
 			}else
 			{
 				//cout<<retd<<endl;//test

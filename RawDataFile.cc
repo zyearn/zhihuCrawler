@@ -20,6 +20,8 @@
  * @version 0.0.0
  * @author zouxin ( zouxin2008@gmail.com )
  * @date 11/3/2008 0.0.0 created, by zouxin
+ * 
+ * @modified on 3/6/2014, by zjs
  */
 #include <iostream>
 #include <fstream>
@@ -92,25 +94,26 @@ void RawDataFile::doSearch(XPage &page)
         body = body.substr(pos + 1);
         if (cur_count < COUNT_THREAD)
         {
-            out << cur_count << " too small!\n";
+            //out << cur_count << " too small!\n";
             continue;
         }
         
         if ((ques_pos = tmpbody.rfind("/question/")) == string::npos)
         {
-            out << "question not found!!! strange thing\n";
+            //out << "question not found!!! strange thing\n";
             continue;
         }
 
         string question_tail = tmpbody.substr(ques_pos);
         if ((ques_pos = question_tail.find("\"")) == string::npos)
         {
-            out << "\" not found!! strange thing\n";
+            //out << "\" not found!! strange thing\n";
             continue;
         }
 
         string question = question_tail.substr(0, ques_pos);
         out << "count = " << cur_count << ", url = www.zhihu.com" << question << std::endl;
+        out.flush();
     }   
     mutex_rawfile.unlock();
     //std::cout << "out the doSearch!!!" << std::endl;

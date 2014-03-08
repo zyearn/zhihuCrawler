@@ -20,6 +20,8 @@
  * @version 0.0.0
  * @author zouxin ( zouxin2008@gmail.com )
  * @date 11/3/2008 0.0.0 created, by zouxin
+ *
+ * @modified on 3/6/2014, by zjs
  */
 #include "config.h"
 #include <sys/time.h>
@@ -83,12 +85,12 @@ void writeHeader(int sock)
 	char cpageNum[100];
 	sprintf(cpageNum,"%d",pageNum);
 
-	const string body="<html>\n<head><title>xyzse real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p>"+string(cpageNum)+"</body></html>";
+	const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p>"+string(cpageNum)+"</body></html>";
 	//send(sock,body.c_str(),body.length(),0);
 
     char num[100];
     sprintf(num, "%d", body.length());
-	const string header="HTTP/1.0 200 OK\r\nServer: xyzse\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
+	const string header="HTTP/1.0 200 OK\r\nServer: ZhihuCrawler\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
 	send(sock,header.c_str(),header.length(),0);
 	send(sock,body.c_str(),body.length(),0);
 }
