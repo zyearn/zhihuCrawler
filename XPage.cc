@@ -23,6 +23,7 @@
  */
 #include "XPage.h"
 #include <stdexcept>
+#include <cstdlib>
 #include "debug.h"
 
 /**

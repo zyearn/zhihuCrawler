@@ -32,6 +32,8 @@
 #include <unistd.h>
 #include <stdlib.h>
 #include <errno.h>
+#include <cstring>
+#include <cstdio>
 /**
  * This code is used to monitor the status of the crawler
  * open your web brower,and visit http://127.0.0.1:8080

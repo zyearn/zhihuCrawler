@@ -29,7 +29,8 @@
 #include <netinet/in.h>
 #include <arpa/inet.h>
 #include <netdb.h>
-#include<iostream>
+#include <cstring>
+#include <iostream>
 #include "debug.h"
 
 /**
