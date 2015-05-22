@@ -39,6 +39,7 @@
 #include <iterator>
 #include <queue>
 #include <signal.h>
+#include <cstdlib>
 #include "debug.h"
 #include <sys/time.h>
 #include <time.h>

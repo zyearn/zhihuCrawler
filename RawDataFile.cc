@@ -26,6 +26,7 @@
 #include <iostream>
 #include <fstream>
 #include <string>
+#include <cstdlib>
 #include "RawDataFile.h"
 #include "ThreadMutex.h"
 
