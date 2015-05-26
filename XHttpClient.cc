@@ -91,7 +91,8 @@ int XHttpClient::download(const string &url,XPage &page)
 	else
 		location=xurl.getPath();
 	//const string reqHeader="GET "+location+" HTTP/1.0\r\nUser-Agent: Linux/1.0\r\n\r\n";	
-	const string reqHeader="GET "+location+" HTTP/1.1\r\nHost: "+xurl.getHost()+"\r\nConnection: close\r\nCache-Control: max-age=0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36\r\nReferer: http://www.zhihu.com/\r\nAccept-Language: zh-CN,zh;q=0.8\r\nCookie: _ga=GA1.2.1265298888.1391701607; zata=zhihu.com.09c0f7c30bfb40eab47235c4483eed27.349568; q_c1=9584d1a430bc4d739872238b7ee4065d|1394029032000|1394029032000; _xsrf=6c239074f448484b84cfd9a2abf1a8e1; q_c0=\"NGY2NWZjYTBhYTI5NGIwNjFjMmZiMGM1MDdjODZlOTl8ZlVqU3cxWUZWQzRibHB1cA==|1394029648|31422c85dae949d3d81077f1b48452e98f0c6479\"; __utma=51854390.1265298888.1391701607.1394029654.1394029654.1; __utmb=51854390.4.10.1394029654; __utmc=51854390; __utmz=51854390.1394029654.1.1.utmcsr=zhihu.com|utmccn=(referral)|utmcmd=referral|utmcct=/; __utmv=51854390.100-1|2=registration_date=20140228=1^3=entry_date=20140228=1; zatb=zhihu.com\r\n\r\n";
+    const string cookie = "";   // your cookie here
+	const string reqHeader="GET "+location+" HTTP/1.1\r\nHost: "+xurl.getHost()+"\r\nConnection: close\r\nCache-Control: max-age=0\r\nAccept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\nUser-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_9_1) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/31.0.1650.63 Safari/537.36\r\nReferer: http://www.zhihu.com/\r\nAccept-Language: zh-CN,zh;q=0.8\r\nCookie: " + cookie + "\r\n\r\n";
     
     //std::cout << "reqHeader = " << reqHeader << std::endl;
 
@@ -275,7 +276,6 @@ int XHttpClient::createConnection(const string &url, XPage &page)
 			memset(&endtv,0,sizeof(endtv));
 			gettimeofday(&endtv,NULL);
 			cout<<"dns time cost "<<endtv.tv_sec-starttv.tv_sec<<endl;
-
 #endif
 
 	if(ip.empty())

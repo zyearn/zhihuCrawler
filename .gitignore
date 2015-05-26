@@ -1,0 +1,7 @@
+*.swp
+*.bak
+*.o
+cantDownload
+datafile
+processlink
+zhihuCrawler
