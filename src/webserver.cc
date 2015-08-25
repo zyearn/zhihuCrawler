@@ -82,7 +82,7 @@ void writeHeader(int sock)
 	struct timeval nowtv;
 	char cnowtv[100];
 	gettimeofday(&nowtv,NULL);
-	sprintf(cnowtv,"%d",nowtv.tv_sec-starttime.tv_sec);
+	sprintf(cnowtv,"%ld",nowtv.tv_sec-starttime.tv_sec);
 
 	char cpageNum[100];
 	sprintf(cpageNum,"%d",pageNum);
@@ -91,7 +91,7 @@ void writeHeader(int sock)
 	//send(sock,body.c_str(),body.length(),0);
 
     char num[100];
-    sprintf(num, "%d", body.length());
+    sprintf(num, "%lu", body.length());
 	const string header="HTTP/1.0 200 OK\r\nServer: ZhihuCrawler\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
 	send(sock,header.c_str(),header.length(),0);
 	send(sock,body.c_str(),body.length(),0);
@@ -103,7 +103,7 @@ void writeBody(int sock)
 	struct timeval nowtv;
 	char cnowtv[100];
 	gettimeofday(&nowtv,NULL);
-	sprintf(cnowtv,"%d",nowtv.tv_sec-starttime.tv_sec);
+	sprintf(cnowtv,"%ld",nowtv.tv_sec-starttime.tv_sec);
 
 	char cpageNum[100];
 	sprintf(cpageNum,"%d",pageNum);
