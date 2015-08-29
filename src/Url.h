@@ -2,15 +2,19 @@
 #define _URL_H
 
 #include <string>
+#include "dbg.h"
+
+#define HTTPPROT    "http://"
+
 using std::string;
 
 class Url
 {
 public:
-    Url(string &url);
+    Url(const string &url);
     ~Url();
     
-    void parse(const string &sUrl)
+    void parse(const string &sUrl);
 
     /*
     * return with "http://"

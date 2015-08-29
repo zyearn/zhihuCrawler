@@ -1,50 +1,54 @@
-/*
- * Copyright (C) 2008 xyzse
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-/**
- * @file DNSManager.h
- * @version 0.0.0
- * @author zouxin ( zouxin2008@gmail.com )
- * @date 11/3/2008 0.0.0 created, by zouxin
- */
 #ifndef _DNSMANAGER_H_
 #define _DNSMANAGER_H_
+
+#include <cstring>
+#include <iostream>
 #include <string>
 #include <set>
 #include <vector>
 #include <map>
+#include <sys/socket.h>
+#include <netinet/in.h>
+#include <arpa/inet.h>
+#include <netdb.h>
+
+#include "Url.h"
+#include "dbg.h"
 
 using namespace std;
 
-class DNSManager
-{
-	public:
-		DNSManager();
-		~DNSManager();
+/*
+ * DNSManager is in charge of maintaining the DNS cache,
+ * check if url is valid, and get ip from url
+ */
 
-		string getIP(const string &host);
-	private:
-		bool isValidHostChar(char ch);
-		bool isValidHost(const char *host);	
-		bool isDomesticIP(string ip);
-		bool isDomainValid(const string &host);
+class DNSManager {
+public:
+    DNSManager();
+    ~DNSManager();
 
+    /*
+     * get the ip of url
+     * url will be checked, and invalid url will be discarded
+     */
+    string getIP(const string &host);
+private:
+    bool isValidHostChar(char ch);
+    bool isValidHost(const char *host);	
 
-		 map<string,string>dnsCache;
-		set<string>domainfilter;
+    /*
+     * check if the ip is in the range of what we want
+     * e.g. China or one university
+     */
+    bool isDomesticIP(string ip);
+
+    /*
+     * we just visit .cn .com .org .net
+     */
+    bool isDomainValid(const string &host);
+
+private:
+    map<string, string> m_dnsCache;
 };
+
 #endif
