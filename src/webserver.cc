@@ -1,4 +1,5 @@
 #include "webserver.h"
+using std::string;
 
 WebServer::WebServer() {
     int iRet = 0;
@@ -90,12 +91,11 @@ int WebServer::sendHtml(int sock)
 	sprintf(cpageNum,"%d",pageNum);
 
 	const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p>"+string(cpageNum)+"</body></html>";
-	//send(sock,body.c_str(),body.length(),0);
 
     char num[100];
     sprintf(num, "%lu", body.length());
-	const string header="HTTP/1.0 200 OK\r\nServer: ZhihuCrawler\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
-	if (send(sock, header.c_str(),header.length(),0) < 0 ||
+    const std::string header="HTTP/1.0 200 OK\r\nServer: ZhihuCrawler\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
+    if (send(sock, header.c_str(),header.length(),0) < 0 ||
 	        send(sock,body.c_str(),body.length(),0) < 0) 
     {
         fprintf(stderr, "error: send\n");

@@ -16,7 +16,7 @@ public:
     Parse();
     ~Parse();
 
-    static void doSearch(char *pContext, int iLen, ofstream &out);
+    static int doSearch(char *pContext, int iLen, ofstream &out);
 };
 
 #endif

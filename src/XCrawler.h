@@ -1,33 +1,40 @@
-/*
- * Copyright (C) 2008 xyzse
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
-*/
-
-/**
- * @file XCrawler.h
- * @version 0.0.0
- * @author zouxin ( zouxin2008@gmail.com )
- * @date 11/3/2008 0.0.0 created, by zouxin
- */
 #ifndef _CRAWLER_H_
 #define _CRAWLER_H_
-#include <string>
+
+#include <iostream>
+#include <fstream>
+#include <set>
 #include <vector>
+#include <queue>
+#include <string>
+#include <iterator>
+#include <signal.h>
+#include <cstdlib>
+#include <time.h>
+#include <unistd.h>
+#include <sys/time.h>
+#include <sys/epoll.h>
+#include <sys/socket.h> /* socket, connect */
+#include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
+#include <netdb.h> /* struct hostent, gethostbyname */
+#include <unistd.h>
+#include <fcntl.h>
+
 #include "CMd5.h"
-#include "XUrl.h"
-#include "RawDataFile.h"
+#include "Url.h"
+#include "Parse.h"
+#include "config.h"
+#include "ThreadMutex.h"
+#include "DNSManager.h"
+#include "dbg.h"
+
+#define MAXEVENTS   1024
+#define MAXCONNS    500
+#define MAXLINE     2048
+#define SMALLLINE   64
+#define HTMLSIZE    524288
+
+#define EPOLLTIMEOUT    1000    //1s
 
 using namespace std;
 
@@ -46,28 +53,35 @@ struct md5comp
 	}
 };
 
-struct urlcomp
-{
-	bool operator()(const string &url1,const string &url2) const
-	{
-		XUrl u1(url1),u2(url2);
-		return u1.getWeight()<u2.getWeight();
-	}
-};
-
-
 class XCrawler
 {
-	public:
-		XCrawler();
-		~XCrawler();
+public:
+    XCrawler();
+    ~XCrawler();
 
-		void start();
-		void fetch();
-	private:
-		void init();
-		void addUrl( string curUrl,const vector<string> &links,int urldeep);
-		RawDataFile m_rawfile;
+    void start();
+    void fetch();
+private:
+    void init();
+    void init_epoll();
+    void addUrl(string curUrl,const vector<string> &links,int urldeep);
+
+    int fetch_url_and_make_connection(int *pFd, string &sUrl);
+    int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
+    int get_response(int iFd, char *pHtmlBody, int *pHtmlSize);
+    int make_socket_non_blocking(int fd);
+
+private:
+    int epfd;
+    struct epoll_event *events;
+    int curConns;
+
+    struct CrawlerState {
+        int iFd;
+        int iState;
+        char base[SMALLLINE];
+        int iLen;
+    };
 };
 
 #endif

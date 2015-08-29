@@ -10,16 +10,21 @@ Parse::~Parse() {
 
 }
 
-void Parse::doSearch(char *pContext, int iLen, ofstream &out) {
+int Parse::doSearch(char *pContext, int iLen, ofstream &out) {
     
+    log_info("in the doSearch");
     string body = string(pContext, iLen);
-    string::size_type pos, ques_pos;
+    string::size_type pos, ques_pos, votecount_pos;
+    string countString;
 
     int cur_count;
-    while ((pos = body.find("class=\"count\"")) != string::npos)
+    while ((pos = body.find("zm-item-vote-info")) != string::npos)
     {
-        cur_count = atoi(body.c_str() + pos + 14);
-        //out << "cur_count = " << cur_count << std::endl;
+        countString = body.substr(pos, 100);
+        votecount_pos = countString.find("data-votecount");
+
+        cur_count = atoi(countString.c_str() + votecount_pos + strlen("data-votecount") + 2);
+        log_info("find count %d", cur_count);
 
         body[pos] = '\0';
         string tmpbody(body.c_str());
@@ -47,6 +52,8 @@ void Parse::doSearch(char *pContext, int iLen, ofstream &out) {
         string question = question_tail.substr(0, ques_pos);
         out << "count = " << cur_count << ", url = www.zhihu.com" << question << std::endl;
         out.flush();
-    }   
-    //std::cout << "out the doSearch!!!" << std::endl;
+    }
+    log_info("leave doSearch");
+
+    return 0;
 }

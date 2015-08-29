@@ -4,6 +4,10 @@ Url::Url(const string &url): m_url(url) {
     parse(url);
 }
 
+Url::Url() {
+
+}
+
 Url::~Url() {
 }
 

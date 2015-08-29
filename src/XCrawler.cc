@@ -1,49 +1,4 @@
-/*
- * Copyright (C) 2008 xyzse
- *
- * This program is free software: you can redistribute it and/or modify
- * it under the terms of the GNU General Public License as published by
- * the Free Software Foundation, either version 3 of the License, or
- * (at your option) any later version.
- *
- * This program is distributed in the hope that it will be useful,
- * but WITHOUT ANY WARRANTY; without even the implied warranty of
- * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
- * GNU General Public License for more details.
-
- * You should have received a copy of the GNU General Public License
- * along with this program.  If not, see <http://www.gnu.org/licenses/>.
- */
-
-/**
- * @file XCrawler.cc
- * @version 0.0.0
- * @author zouxin ( zouxin2008@gmail.com )
- * @date 11/3/2008 0.0.0 created, by zouxin
- *
- * @modified on 3/6/2014, by zjs
- */
-
 #include "XCrawler.h"
-#include "XUrl.h"
-#include "config.h"
-#include "ThreadMutex.h"
-#include "XHttpClient.h"
-#include "DNSManager.h"
-#include "XPage.h"
-#include <pthread.h>
-#include <iostream>
-#include <fstream>
-#include <set>
-#include <vector>
-#include <iterator>
-#include <queue>
-#include <signal.h>
-#include <cstdlib>
-#include "debug.h"
-#include <sys/time.h>
-#include <time.h>
-#include <unistd.h>
 
 /**
  * The most important class.
@@ -53,120 +8,80 @@
  * 
  */
 
-//
-priority_queue<string,vector<string>,urlcomp>unvisitedUrl[MAX_CRAWLER_DEEP];
+queue<string> unvisitedUrl;
 
-set<MD5,md5comp>visitedUrlMd5;
+set<MD5,md5comp> visitedUrlMd5;
 
-set<MD5,md5comp>visitedPageMd5;
+set<MD5,md5comp> unreachableHostMd5;
 
-set<MD5,md5comp>unreachableHostMd5;
-
-//
-ThreadMutex mutex_unvisitedUrl[MAX_CRAWLER_DEEP]; 
+ThreadMutex mutex_unvisitedUrl[20]; 
 ThreadMutex mutex_visitedUrl;
 ThreadMutex mutex_unreachable_host;
 ThreadMutex mutex_processlink;
 ThreadMutex mutex_pagenum;
-//
+
 DNSManager dnsMana;
-//
+
 ofstream fout("./processlink");
+ofstream fResultOut(RAW_DATA_FILE.c_str());
 
-XCrawler::XCrawler():m_rawfile(RAW_DATA_FILE)
-{
+XCrawler::XCrawler():
+    curConns(0) {
+
     init();
+    init_epoll();
 }
 
-XCrawler::~XCrawler()
-{
+XCrawler::~XCrawler() {
 
 }
 
+void XCrawler::init() {
+    string strLine;
 
-static void sig_stop_handler(int sig)
-{
-    cout<<"catch term signal"<<endl;
-    //do something to save current status
-}
-
-void XCrawler::init()
-{
-    signal(SIGTERM,sig_stop_handler);
-
-    try{
-        string strLine;
-
-        ifstream init_file;
-        init_file.open(SEEDS_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-
-        while(getline(init_file,strLine))
-            unvisitedUrl[0].push(strLine);
-        init_file.close();
-
-        init_file.open(VISITED_URL_MD5_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-
-        while(getline(init_file,strLine))
-        {
-            CMD5 tempCmd5(strLine.c_str());
-            visitedUrlMd5.insert(tempCmd5.getResult());
-        }
-        init_file.close();
-
-        init_file.open(VISITED_PAGE_MD5_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-
-        while(getline(init_file,strLine))
-        {
-            CMD5 tempCmd5(strLine.c_str());
-            visitedPageMd5.insert(tempCmd5.getResult());
-        }
-        init_file.close();
-
-        init_file.open(UNREACHABLE_HOST_MD5_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-        while(getline(init_file,strLine))
-        {
-            CMD5 tempCmd5(strLine.c_str());
-            unreachableHostMd5.insert(tempCmd5.getResult());
-        }
-        init_file.close();
-
-        init_file.open(UNVISITED_URL_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-        //do something
-        while(getline(init_file,strLine))
-        {
-            //unvisitedUrl[0].push(strLine);
-        }
-        //
-        init_file.close();
-
-        init_file.open(IP_CN_FILE.c_str(),ios::binary);
-        if(!init_file)
-            throw exception();
-        //do something
-        //
-        init_file.close();
-
-
+    ifstream init_file;
+    init_file.open(SEEDS_FILE.c_str(), ios::binary);
+    if (!init_file) {
+        exit(0);
     }
-    catch(exception)
-    {
-        cerr<<"error:can not open file"<<endl;
-        exit(1);
-    }	
+    while (getline(init_file, strLine)) {
+        unvisitedUrl.push(strLine);
+    }
+    init_file.close();
 
+    init_file.open(VISITED_URL_MD5_FILE.c_str(), ios::binary);
+    if (!init_file) {
+        exit(0);
+    }
+
+    while (getline(init_file,strLine)) {
+        CMD5 tempCmd5(strLine.c_str());
+        visitedUrlMd5.insert(tempCmd5.getResult());
+    }
+    init_file.close();
+
+    init_file.open(UNREACHABLE_HOST_MD5_FILE.c_str(),ios::binary);
+    if(!init_file) {
+        exit(0);
+    }
+
+    while(getline(init_file,strLine)) {
+        CMD5 tempCmd5(strLine.c_str());
+        unreachableHostMd5.insert(tempCmd5.getResult());
+    }
+    init_file.close();
 }
 
-void *run(void *arg)
+void XCrawler::init_epoll() {
+    int fd = epoll_create1(0);
+    check(fd > 0, "epoll_create");
+
+    events = (struct epoll_event *)malloc(sizeof(struct epoll_event) * MAXEVENTS);
+
+    epfd = fd;
+}
+
+static void *run(void *arg)
 {
     ((XCrawler *)arg)->fetch();
     return NULL;
@@ -174,286 +89,244 @@ void *run(void *arg)
 
 void XCrawler::start()
 {
-    pthread_t tids[THREAD_NUM];
-    for(int i=0;i<THREAD_NUM;i++)
-        if(pthread_create(&tids[i],NULL,run,this)) 
-        {
-            perror("pthread_create");
-            exit(2);
-        }
+    pthread_t tid;
+    int iRet = 0;
 
-    for(int i=0;i<THREAD_NUM;i++)
-        pthread_join(tids[i],NULL);
+    iRet = pthread_create(&tid, NULL, run, this);
+    if (iRet < 0) {
+        perror("pthread_create");
+        exit(0);
+    }
+
+    pthread_join(tid, NULL);
 }
 
 void XCrawler::fetch()
 {
-    string url("");
-    //XHttpClient http;
+    int iRet = 0;
+    string url;
+    char getReq[MAXLINE];
+    char htmlBody[HTMLSIZE];
 
-    while(1)
-    {
+    while (true) {
         int i;
-        for(i=0;i<MAX_CRAWLER_DEEP;i++)
-        {
-            mutex_unvisitedUrl[i].lock();
 
-            if(unvisitedUrl[i].empty())
-            {
-                mutex_unvisitedUrl[i].unlock();
-                continue;
-            }
-            url=unvisitedUrl[i].top();
-            unvisitedUrl[i].pop();
-
-            mutex_unvisitedUrl[i].unlock();
-            break;
-        }
-
-        CMD5 urldigest;
-        urldigest.GenerateMD5((unsigned char*)url.c_str(), url.length());
-        mutex_visitedUrl.lock();
-        if( visitedUrlMd5.find(urldigest.getResult()) != visitedUrlMd5.end())
-        {
-            mutex_visitedUrl.unlock();
-            continue;
-        }
-        mutex_visitedUrl.unlock();
-
-        if (i < MAX_CRAWLER_DEEP)
-        {
-            mutex_processlink.lock();
-            fout << "curdeep = " << i << ", url = " << url << std::endl;
-            fout.flush();
-            mutex_processlink.unlock();
-        }
-        //if (i < MAX_CRAWLER_DEEP)
-        //    std::cout << "url=" << url << std::endl;    
-
-        XPage page;
-        vector<string>links;
-        if(i<MAX_CRAWLER_DEEP)//i+1 is the url deepth
-        {
-
-            //ofstream foutt("./iMAX", ios_base::app);
-            //foutt << "i<MAX, url = " << url << std::endl;
-
-            CMD5 url_md5;
-            url_md5.GenerateMD5((unsigned char*)url.c_str(),url.length());
-            mutex_visitedUrl.lock();
-            visitedUrlMd5.insert(url_md5.getResult());
-            mutex_visitedUrl.unlock();
-            //foutt<<"add MD5: "<<url_md5.ToString()<<endl <<endl;
-            //foutt.close();
-            //pageNum++;
-#ifdef debug
-            //	struct timeval starttv={0,0};
-            //	memset(&starttv,0,sizeof(starttv));
-            //	gettimeofday(&starttv,NULL);
-            //cout<<pthread_self()%THREAD_NUM<<"is going to download"<<url<<endl;
-#endif
-            XHttpClient http;
-            int	retd=http.download(url+"/answers?order_by=vote_num",page);
-#ifdef debug
-            //	struct timeval endtv={0,0};
-            //	memset(&endtv,0,sizeof(endtv));
-            //	gettimeofday(&endtv,NULL);
-            //	cout<<"time cost "<<endtv.tv_sec-starttv.tv_sec<<endl;
-
-#endif
-
-            if(retd==0)
-            {
-                //cout<<page.getHeader();//test
-                //cout<<page.getBody()<<endl;//test
-
-                //the MAX_DEEP's page need not to get links
-
-                m_rawfile.doSearch(page);
-                mutex_pagenum.lock();
-                pageNum++;
-                mutex_pagenum.unlock();
-
-                if(i<MAX_CRAWLER_DEEP-1)
-                {
-                    XPage fer_page;
-                    XHttpClient fer_http;
-                    if (fer_http.download(url + "/followers", fer_page) != 0)
-                    {
-                        cerr << "download follower error\n" << std::endl;
-                    }
-                    else
-                        links = fer_page.getLinks();
-
-                    if(!links.empty())
-                        addUrl(url,links,i);
-                    links.clear();
-
-                    XPage fee_page;
-                    XHttpClient fee_http;
-                    if (fee_http.download(url + "/followees", fee_page) != 0)
-                    {
-                        cerr << "download followee error\n" << std::endl;
-                    }
-                    else
-                        links = fee_page.getLinks();
-
-                    if(!links.empty())
-                        addUrl(url,links,i);
-                    links.clear();
-                }
-                //////////redirect
-                if(page.getStatusCode()==301||page.getStatusCode()==302)//redirect to location
-                {
-                    cout<<"found redirection:: "<<page.getLocation()<<endl;
+        do {
+            if (curConns < MAXCONNS) {
+                int iFd;
+                string sUrl;
+                iRet = fetch_url_and_make_connection(&iFd, sUrl);
+                if (iRet < 0) {
+                    log_err("fetch_url_and_make_connection");
+                    break;
                 }
 
-                /////////put the url into visitedUurl 
-                /*	CMD5 url_md5;
-                    url_md5.GenerateMD5((unsigned char*)url.c_str(),url.length());
-                    mutex_visitedUrl.lock();
-                    visitedUrlMd5.insert(url_md5.getResult());
-                    mutex_visitedUrl.unlock();
-                //cout<<"add MD5: "<<url_md5.ToString()<<endl;
-                pageNum++;*/
-                //pageNum++;
-                //
-                //m_rawfile.write(page);
-            }else
-            {
-                //cout<<retd<<endl;//test
-                if(retd==-6)
-                    cout<<"bad status code from "<<url<<" "<<page.getStatusCode()<<endl;
+                int size = MAXLINE;
+                iRet = prepare_get_answer_request(getReq, &size, sUrl);
+                if (iRet < 0) {
+                    log_err("prepare_get_answer_request");
+                    break;
+                }
 
-                CMD5 unreachhost_md5;
-                XUrl badurl(url);
-                string badhost=badurl.getHost();
-                unreachhost_md5.GenerateMD5((unsigned char*)badhost.c_str(),badhost.length());
-                mutex_unreachable_host.lock();
-                unreachableHostMd5.insert(unreachhost_md5.getResult());
-                mutex_unreachable_host.unlock();
+                log_info("header size = %d", size);
+                iRet = write(iFd, getReq, size);
+                if (iRet < 0) {
+                    log_err("write");
+                    break;
+                }
 
-                mutex_visitedUrl.lock();
-                ofstream fout("./cantDownload", ios_base::app);
-                fout << "cant download: " << url << ", push again"<< std::endl;
-                fout.close();
-                set<MD5,md5comp>::iterator it = visitedUrlMd5.find(url_md5.getResult());
-                visitedUrlMd5.erase(it);                
-                mutex_visitedUrl.unlock();
+                struct epoll_event event;
+                CrawlerState *pState= (CrawlerState *)malloc(sizeof(CrawlerState));
+                pState->iFd = iFd;
+                pState->iState = 0;
+                memcpy(pState->base, sUrl.c_str(), sUrl.size());
+                pState->iLen = sUrl.size();
 
-                mutex_unvisitedUrl[0].lock();
-                unvisitedUrl[0].push(url);
-                mutex_unvisitedUrl[0].unlock();
+                event.data.ptr = (void *)pState;
+                event.events = EPOLLIN | EPOLLET;
+
+                iRet = epoll_ctl(epfd, EPOLL_CTL_ADD, iFd, &event);
+                check(iRet == 0, "epoll_add");
+
+                curConns++;
             }
+        } while(0);
+        
+        int n = epoll_wait(epfd, events, MAXEVENTS, EPOLLTIMEOUT);
+        log_info("return from epoll_wait!, n = %d", n);
+        check(n >= 0, "epoll_wait");
+        CrawlerState *pState;
+        int readCount;
+        int last;
 
+        for (i=0; i<n; i++) {
+            pState = (CrawlerState *)events[i].data.ptr;
+            readCount = last = 0;
+            int iHtmlSize = HTMLSIZE;
 
-        }//end if
+            switch (pState->iState) {
+                case 0:
+                    iRet = get_response(pState->iFd, htmlBody, &iHtmlSize);
+                    if (iRet < 0) {
+                        log_err("get_response");
+                        continue;
+                    }
 
+                    Parse::doSearch(htmlBody, iHtmlSize, fResultOut);
 
-#ifdef debug
-        //cout<<"queue0 size: "<<unvisitedUrl[0].size()<<", ";
-        //cout<<"queue1 size: "<<unvisitedUrl[1].size()<<endl;
-        /*cout<<unvisitedUrl[2].size()<<endl;
-          const int number=1;
-          while(!unvisitedUrl[number].empty())
-          {
-          cout<<unvisitedUrl[number].top()<<endl;
-          unvisitedUrl[number].pop();
-          }*/
-#endif
-
-        if(i==MAX_CRAWLER_DEEP)
-        {
-            sleep(1);
-            printf("thread %ld: no data to process\n", (long)(pthread_self()) % THREAD_NUM);
+                    // add followers and followees link to queue
+                    break;
+                default:
+                    break;
+            } 
         }
-        usleep(100000);
-    }//end while
+
+    } //end while
 }
 
-//urldeep is curUrl's deep ,begin with 0
+int XCrawler::get_response(int iFd, char *pHtmlBody, int *pHtmlSize) {
+    int iRet = 0;
+    int last = 0, nRead = 0;
+    while (1) {
+        nRead = read(iFd, pHtmlBody+last, *pHtmlSize-last);
+        log_info("nRead == %d", nRead);
+
+        if (nRead == 0) {
+            // EOF
+            close(iFd);
+            curConns--;
+            *pHtmlSize = last;
+            log_err("EOF");
+
+            return -1;
+        }
+
+        if (nRead < 0) {
+            if (errno != EAGAIN) {
+                log_err("read err, and errno = %d", errno);
+                iRet = -1;
+                close(iFd);
+                curConns--;
+            }
+
+            break;
+        }
+        
+        last += nRead;
+    }
+
+    *pHtmlSize = last;
+    return iRet;
+}
+
+int XCrawler::fetch_url_and_make_connection(int *pFd, string &sUrl) {
+    int iRet = 0;
+    Url url;
+
+    int i;
+
+    while (1) {
+    
+        if(unvisitedUrl.empty()) {
+            sleep(1);
+            printf("thread %ld: no data to process\n", (long)(pthread_self()) % THREAD_NUM);
+            return -1;
+        }
+
+        sUrl = unvisitedUrl.front();
+        unvisitedUrl.pop();
+
+        CMD5 urlDigest;
+        urlDigest.GenerateMD5((unsigned char*)sUrl.c_str(), sUrl.length());
+        if (visitedUrlMd5.find(urlDigest.getResult()) != visitedUrlMd5.end()) {
+            continue;
+        }
+
+        visitedUrlMd5.insert(urlDigest.getResult());
+        url.parse(sUrl);
+
+        break;
+    }
+
+    log_info("fetch success! url = %s", url.getUrl().c_str());
+
+    // make connection
+    int iConnfd = socket(AF_INET, SOCK_STREAM, 0);
+    if (iConnfd < 0) {
+        log_err("socket");
+        return -1;
+    }
+
+    struct hostent *server;
+    struct sockaddr_in servAddr;
+
+    //string ip = dnsMana.getIP(url.getHost());
+    string ip = "60.28.215.98";
+    
+    memset(&servAddr, 0, sizeof(servAddr));
+    servAddr.sin_family = AF_INET;
+    servAddr.sin_port = htons(80);
+    servAddr.sin_addr.s_addr = inet_addr(ip.c_str());
+
+    iRet = connect(iConnfd, (struct sockaddr *)&servAddr, sizeof(servAddr));
+    if (iRet < 0) {
+        log_err("connect");
+        return iRet;
+    }
+
+    iRet = make_socket_non_blocking(iConnfd);
+    if (iRet < 0) {
+        log_err("make_socket_non_blocking");
+        return -1;
+    }
+
+    *pFd = iConnfd;
+
+    return iRet;
+}
+
+int XCrawler::prepare_get_answer_request(char *pReq, int *pSize, string &sUrl) {
+    Url url(sUrl);
+    int iRet = 0;
+    iRet = snprintf(pReq, *pSize,
+            "GET %s/answers?order_by=vote_num HTTP/1.1\r\n"
+            "Host: www.zhihu.com\r\n"
+            "Connection: keep-alive\r\n"
+            "Cache-Control: max-age=0\r\n"
+            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
+            "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36\r\n"
+            "Accept-Language: zh-CN,zh;q=0.8\r\n"
+            "Cookie: 497bbfca7ece1a80b3c2|1439028813000|1439028813000; cap_id=\"MjdiYjRhYTMwZWRjNGQ4Mzk2NzY3ODBjOTRmMTliNzc=|1439028813|c679a1a7f3b1c5b5e93f43c8b60a2e98e6d19622\"; _za=48f64d9f-72fd-442f-87d5-da361c78a78b; _xsrf=8b168cbe68b95f8cc7b5a0314604c929; tc=AQAAAOLP7xOLngYAU3ettDCYfqNxebki; __utmt=1; z_c0=\"QUFCQTA0MGJBQUFYQUFBQVlRSlZUVWpkQ0ZhczBXTlIyUWZXY2FSZ0dOYjZlXzNuTGxnMW9BPT0=|1440829512|5553a3201a87ffb39a2f3c7cc3547a6f1e8a36b2\"; unlock_ticket=\"QUFCQTA0MGJBQUFYQUFBQVlRSlZUVkJYNFZXTXNIZXNJZVNGODJIQnFLZW02bUZRN2RoR29BPT0=|1440829512|7bafe26c0fcc0de5b4745a5172ef692547567769\"; __utma=51854390.562502159.1440676843.1440820771.1440828553.9; __utmb=51854390.46.10.1440828553; __utmc=51854390; __utmz=51854390.1440820771.8.5.utmcsr=google|utmccn=(organic)|utmcmd=organic|utmctr=(not%%20provided); __utmv=51854390.100--|2=registration_date=20130524=1^3=entry_date=20130524=1\r\n"
+            "\r\n", url.getPath().c_str());
+
+    if (iRet < 0) {
+        log_err("snprintf");
+        return iRet;
+    }
+
+    *pSize = iRet;
+    return 0;
+}
+
+int XCrawler::make_socket_non_blocking(int fd) {
+    int flags, s;
+    flags = fcntl(fd, F_GETFL, 0);
+    if (flags == -1) {
+        log_err("fcntl");
+        return -1;
+    }
+
+    flags |= O_NONBLOCK;
+    s = fcntl(fd, F_SETFL, flags);
+    if (s == -1) {
+        log_err("fcntl");
+        return -1;
+    }
+
+    return 0;
+}
+
 void XCrawler::addUrl( string curUrl,const vector<string> &links,int urldeep)
 {
-    vector<string>::const_iterator iter_link;
-    string templink;
-    for( iter_link=links.begin();iter_link!=links.end();iter_link++)
-    {
-        templink=*iter_link;
 
-        if(templink.empty()||templink.length()>256)
-            continue;
-        /*
-           if( (templink.length()>= 4 && templink.substr(0,4)!="http") ||
-           templink.length()<4)//if true,mean it's reference link
-           {
-           if(templink.at(0)=='.')//this version we temporily do not deal with this situation
-           continue;
-           if( (curUrl.rfind("/")!=curUrl.length()-1 && templink.substr(0,1)=="/")||
-           (curUrl.rfind("/")==curUrl.length()-1 && templink.substr(0,1)!="/")) 
-           templink=curUrl+templink;
-           else if(curUrl.rfind("/")!=curUrl.length()-1 && templink.substr(0,1)!="/"  )
-           templink=curUrl+"/"+templink;
-           else
-           {
-           templink=curUrl+templink.substr(1);
-           }
-
-           }	
-         */
-
-#ifdef debug
-        //cout<<templink<<endl;
-#endif
-
-        //
-        CMD5 urldigest;
-        urldigest.GenerateMD5((unsigned char*)templink.c_str(),templink.length());
-        mutex_visitedUrl.lock();
-        //ofstream fout("./hasvisit", ios_base::app);
-        if( visitedUrlMd5.find(urldigest.getResult()) != visitedUrlMd5.end())
-        {
-            //fout<<"!!!!!!!has visited :"<<templink<<endl;
-            mutex_visitedUrl.unlock();
-            continue;
-        }
-        //fout << "sobad, " << templink << std::endl;
-        //fout << "md5 = " << urldigest.ToString() << std::endl << std::endl;
-        //fout.close();
-        mutex_visitedUrl.unlock();
-
-        //
-        XUrl url(templink);
-        string host=url.getHost();
-        CMD5 hostdigest;
-        hostdigest.GenerateMD5((unsigned char *)host.c_str(),host.length());
-        mutex_unreachable_host.lock();
-        if( unreachableHostMd5.find(hostdigest.getResult())
-                !=unreachableHostMd5.end())
-        {
-            mutex_unreachable_host.unlock();
-            continue;
-        }
-        mutex_unreachable_host.unlock();
-
-        //
-        /*if(url.getPath().empty())//means it's a website's root url
-          {
-        //root url should put into the first priority queue
-        mutex_unvisitedUrl[0].lock();
-        unvisitedUrl[0].push(templink);
-        mutex_unvisitedUrl[0].unlock();
-        }else*/
-        {
-            //the other url should put into the urldeep+1 priority queue
-            mutex_unvisitedUrl[urldeep+1].lock();
-            unvisitedUrl[urldeep+1].push(templink);
-            mutex_unvisitedUrl[urldeep+1].unlock();
-        }
-
-        /*
-           mutex_unvisitedUrl[1].lock();
-           unvisitedUrl[1].push(templink);
-           mutex_unvisitedUrl[1].unlock();*/
-
-    }//end for
 }

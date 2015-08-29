@@ -8,9 +8,9 @@
 
 using std::string;
 
-class Url
-{
+class Url {
 public:
+    Url();
     Url(const string &url);
     ~Url();
     
