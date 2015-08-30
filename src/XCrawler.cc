@@ -22,7 +22,6 @@ ThreadMutex mutex_pagenum;
 
 DNSManager dnsMana;
 
-ofstream fout("./processlink");
 ofstream fResultOut(RAW_DATA_FILE.c_str());
 
 XCrawler::XCrawler():
@@ -57,17 +56,6 @@ void XCrawler::init() {
     while (getline(init_file,strLine)) {
         CMD5 tempCmd5(strLine.c_str());
         visitedUrlMd5.insert(tempCmd5.getResult());
-    }
-    init_file.close();
-
-    init_file.open(UNREACHABLE_HOST_MD5_FILE.c_str(),ios::binary);
-    if(!init_file) {
-        exit(0);
-    }
-
-    while(getline(init_file,strLine)) {
-        CMD5 tempCmd5(strLine.c_str());
-        unreachableHostMd5.insert(tempCmd5.getResult());
     }
     init_file.close();
 }
