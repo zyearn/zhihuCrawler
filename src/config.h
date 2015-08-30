@@ -1,5 +1,7 @@
 #include <string>
+#include <queue>
 using std::string;
+using std::queue;
 
 /**
  * you can configure the crawler here
@@ -19,3 +21,5 @@ extern string UNREACHABLE_HOST_MD5_FILE;
 extern string RAW_DATA_FILE;
 
 extern int pageNum;
+extern queue<string> unvisitedUrl;
+extern string cookie;

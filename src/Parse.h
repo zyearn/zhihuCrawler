@@ -5,6 +5,7 @@
 #include <fstream>
 #include <string>
 #include <cstdlib>
+#include <vector>
 
 #include "dbg.h"
 
@@ -16,7 +17,8 @@ public:
     Parse();
     ~Parse();
 
-    static int doSearch(char *pContext, int iLen, ofstream &out);
+    static int SearchAnswer(char *pContext, int iLen, ofstream &out);
+    static int SearchFollowers(char *pContext, int iLen, vector<string> &vFollow);
 };
 
 #endif

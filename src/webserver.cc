@@ -87,10 +87,11 @@ int WebServer::sendHtml(int sock)
 	gettimeofday(&nowtv,NULL);
 	sprintf(cnowtv,"%ld",nowtv.tv_sec-startTime.tv_sec);
 
-	char cpageNum[100];
-	sprintf(cpageNum,"%d",pageNum);
+	char cPeopleNum[100];
+	sprintf(cPeopleNum, "%zu", unvisitedUrl.size());
 
-	const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p>"+string(cpageNum)+"</body></html>";
+    
+	const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p> send queue has " + string(cPeopleNum) + " people.</body></html>";
 
     char num[100];
     sprintf(num, "%lu", body.length());

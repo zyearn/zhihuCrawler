@@ -10,10 +10,10 @@ Parse::~Parse() {
 
 }
 
-int Parse::doSearch(char *pContext, int iLen, ofstream &out) {
-    
-    log_info("in the doSearch");
+int Parse::SearchAnswer(char *pContext, int iLen, ofstream &out) {
+
     string body = string(pContext, iLen);
+
     string::size_type pos, ques_pos, votecount_pos;
     string countString;
 
@@ -53,7 +53,34 @@ int Parse::doSearch(char *pContext, int iLen, ofstream &out) {
         out << "count = " << cur_count << ", url = www.zhihu.com" << question << std::endl;
         out.flush();
     }
-    log_info("leave doSearch");
+
+    return 0;
+}
+
+int Parse::SearchFollowers(char *pContext, int iLen, vector<string> &vFollow) {
+    string body = string(pContext, iLen);
+    string::size_type pos, start, end;
+
+    string follower;
+
+    while ((pos = body.find("zm-list-content-title")) != string::npos) {
+
+        start = body.find("http://www.zhihu.com/people/", pos);
+        if (start == string::npos) {
+            return 0;
+        }
+
+        int end = body.find("\"", start);
+        if (end == string::npos) {
+            return 0;
+        }
+
+        follower = body.substr(start, end - start);
+        log_info("find followee! %s", follower.c_str());
+
+        body = body.substr(end + 1);
+        vFollow.push_back(follower);
+    }
 
     return 0;
 }

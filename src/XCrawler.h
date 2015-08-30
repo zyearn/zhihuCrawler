@@ -16,7 +16,7 @@
 #include <sys/epoll.h>
 #include <sys/socket.h> /* socket, connect */
 #include <netinet/in.h> /* struct sockaddr_in, struct sockaddr */
-#include <netdb.h> /* struct hostent, gethostbyname */
+#include <netdb.h>      /* struct hostent, gethostbyname */
 #include <unistd.h>
 #include <fcntl.h>
 
@@ -38,18 +38,17 @@
 
 using namespace std;
 
-struct md5comp
-{
-	bool operator()(const MD5 &d1, const MD5 &d2) const
-	{
-		for(int i=0;i<4;i++)
-		{
-			if(d1.data[i]<d2.data[i])
-				return true;
-			else if(d1.data[i]>d2.data[i])
-				return false;
-		}
-		return false;//make sure the when A equal B	
+struct md5comp {
+	bool operator()(const MD5 &d1, const MD5 &d2) const {
+        for (int i = 0; i<4; i++) {
+            if (d1.data[i] < d2.data[i]) {
+                return true;
+            } else if(d1.data[i]>d2.data[i]) {
+                return false;
+            }
+        }
+
+        return false;//make sure the when A equal B	
 	}
 };
 
@@ -64,12 +63,16 @@ public:
 private:
     void init();
     void init_epoll();
-    void addUrl(string curUrl,const vector<string> &links,int urldeep);
 
-    int fetch_url_and_make_connection(int *pFd, string &sUrl);
+    //int fetch_url_and_make_connection(int *pFd, string &sUrl);
+    int fetch_url(string &sUrl);
+    int make_connection(int *pFd);
     int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl);
     int get_response(int iFd, char *pHtmlBody, int *pHtmlSize);
     int make_socket_non_blocking(int fd);
+    void push_urls(vector<string> &vFollows);
 
 private:
     int epfd;
