@@ -26,8 +26,9 @@ public:
     }
 
 private:
-    
+
     pthread_mutex_t mutex_;
+    
 
 };
 

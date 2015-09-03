@@ -3,7 +3,6 @@
 #include <sys/time.h>
 #include <time.h>
 
-#include "CMd5.h"
 #include "XCrawler.h"
 #include "Url.h"
 #include "config.h"

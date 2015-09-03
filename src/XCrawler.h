@@ -19,12 +19,11 @@
 #include <netdb.h>      /* struct hostent, gethostbyname */
 #include <unistd.h>
 #include <fcntl.h>
+#include <assert.h>
 
-#include "CMd5.h"
 #include "Url.h"
 #include "Parse.h"
 #include "config.h"
-#include "ThreadMutex.h"
 #include "DNSManager.h"
 #include "dbg.h"
 
@@ -38,20 +37,6 @@
 
 using namespace std;
 
-struct md5comp {
-	bool operator()(const MD5 &d1, const MD5 &d2) const {
-        for (int i = 0; i<4; i++) {
-            if (d1.data[i] < d2.data[i]) {
-                return true;
-            } else if(d1.data[i]>d2.data[i]) {
-                return false;
-            }
-        }
-
-        return false;//make sure the when A equal B	
-	}
-};
-
 class XCrawler
 {
 public:
@@ -60,19 +45,6 @@ public:
 
     void start();
     void fetch();
-private:
-    void init();
-    void init_epoll();
-
-    //int fetch_url_and_make_connection(int *pFd, string &sUrl);
-    int fetch_url(string &sUrl);
-    int make_connection(int *pFd);
-    int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
-    int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl);
-    int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl);
-    int get_response(int iFd, char *pHtmlBody, int *pHtmlSize);
-    int make_socket_non_blocking(int fd);
-    void push_urls(vector<string> &vFollows);
 
 private:
     int epfd;
@@ -84,7 +56,24 @@ private:
         int iState;
         char base[SMALLLINE];
         int iLen;
+        char htmlBody[HTMLSIZE];
+        int iLast;
     };
+private:
+    void init();
+    void init_epoll();
+
+    //int fetch_url_and_make_connection(int *pFd, string &sUrl);
+    int fetch_url(string &sUrl);
+    int make_connection(int *pFd);
+    int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl);
+    int get_response(CrawlerState *pState);
+    int make_socket_non_blocking(int fd);
+    void push_urls(vector<string> &vFollows);
+    int is_valid_html(char *pHtml, int iSize);
+
 };
 
 #endif

@@ -10,10 +10,12 @@ Parse::~Parse() {
 
 }
 
+ofstream fBodyOut("./bodyOut");
+
 int Parse::SearchAnswer(char *pContext, int iLen, ofstream &out) {
 
     string body = string(pContext, iLen);
-
+    fBodyOut << "Bodyout: " << body << endl;
     string::size_type pos, ques_pos, votecount_pos;
     string countString;
 
@@ -58,7 +60,9 @@ int Parse::SearchAnswer(char *pContext, int iLen, ofstream &out) {
 }
 
 int Parse::SearchFollowers(char *pContext, int iLen, vector<string> &vFollow) {
+    cout << "in the SearchFollowers" << endl;
     string body = string(pContext, iLen);
+    fBodyOut << "Bodyout: " << body << endl;
     string::size_type pos, start, end;
 
     string follower;

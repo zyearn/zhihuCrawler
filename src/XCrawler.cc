@@ -9,19 +9,8 @@
  */
 
 queue<string> unvisitedUrl;
-
-set<MD5,md5comp> visitedUrlMd5;
-
-set<MD5,md5comp> unreachableHostMd5;
-
-ThreadMutex mutex_unvisitedUrl[20]; 
-ThreadMutex mutex_visitedUrl;
-ThreadMutex mutex_unreachable_host;
-ThreadMutex mutex_processlink;
-ThreadMutex mutex_pagenum;
-
+set<string> visitedUrl;
 DNSManager dnsMana;
-
 ofstream fResultOut(RAW_DATA_FILE.c_str());
 
 XCrawler::XCrawler():
@@ -53,9 +42,8 @@ void XCrawler::init() {
         exit(0);
     }
 
-    while (getline(init_file,strLine)) {
-        CMD5 tempCmd5(strLine.c_str());
-        visitedUrlMd5.insert(tempCmd5.getResult());
+    while (getline(init_file, strLine)) {
+        visitedUrl.insert(strLine);
     }
     init_file.close();
 }
@@ -94,7 +82,6 @@ void XCrawler::fetch()
     int iRet = 0;
     string url;
     char reqBuf[MAXLINE];
-    char htmlBody[HTMLSIZE];
 
     int iFd;
     string sUrl;
@@ -135,6 +122,7 @@ void XCrawler::fetch()
                 pState->iState = 0;
                 memcpy(pState->base, sUrl.c_str(), sUrl.size());
                 pState->iLen = sUrl.size();
+                pState->iLast = 0;
 
                 struct epoll_event event;
                 event.data.ptr = (void *)pState;
@@ -151,28 +139,31 @@ void XCrawler::fetch()
         check(n >= 0, "epoll_wait");
 
         CrawlerState *pState;
-        int readCount;
-        int last;
 
         for (i=0; i<n; i++) {
             pState = (CrawlerState *)events[i].data.ptr;
-            readCount = last = 0;
-            int iHtmlSize = HTMLSIZE;
             int iHeaderSize = MAXLINE;
             vector<string> vFollows;
 
             switch (pState->iState) {
                 case 0:
-                    iRet = get_response(pState->iFd, htmlBody, &iHtmlSize);
+                    iRet = get_response(pState);
                     if (iRet < 0) {
                         log_err("get_response");
                         continue;
                     }
+                    
+                    // parse html
+                    iRet = is_valid_html(pState->htmlBody, pState->iLast);
+                    if (iRet != 0) {
+                        break;
+                    }
 
-                    Parse::SearchAnswer(htmlBody, iHtmlSize, fResultOut);
+                    Parse::SearchAnswer(pState->htmlBody, pState->iLast, fResultOut);
 
                     // add followers link to queue
                     pState->iState++;
+                    pState->iLast = 0;
                     sUrl = string(pState->base, pState->iLen);
 
                     iRet = prepare_get_followers_request(reqBuf, &iHeaderSize, sUrl);
@@ -190,18 +181,24 @@ void XCrawler::fetch()
                     break;
 
                 case 1:
-                    iRet = get_response(pState->iFd, htmlBody, &iHtmlSize);
+                    iRet = get_response(pState);
                     if (iRet < 0) {
                         log_err("get_response");
                         continue;
                     }
 
-                    Parse::SearchFollowers(htmlBody, iHtmlSize, vFollows);
+                    iRet = is_valid_html(pState->htmlBody, pState->iLast);
+                    if (iRet != 0) {
+                        break;
+                    }
+
+                    Parse::SearchFollowers(pState->htmlBody, pState->iLast, vFollows);
 
                     push_urls(vFollows);
 
                     // add followees link to queue
                     pState->iState++;
+                    pState->iLast = 0;
                     sUrl = string(pState->base, pState->iLen);
 
                     iRet = prepare_get_followees_request(reqBuf, &iHeaderSize, sUrl);
@@ -219,13 +216,18 @@ void XCrawler::fetch()
                     break;
 
                 case 2:
-                    iRet = get_response(pState->iFd, htmlBody, &iHtmlSize);
+                    iRet = get_response(pState);
                     if (iRet < 0) {
                         log_err("get_response");
                         continue;
                     }
 
-                    Parse::SearchFollowers(htmlBody, iHtmlSize, vFollows);
+                    iRet = is_valid_html(pState->htmlBody, pState->iLast);
+                    if (iRet != 0) {
+                        break;
+                    }
+
+                    Parse::SearchFollowers(pState->htmlBody, pState->iLast, vFollows);
 
                     push_urls(vFollows);
 
@@ -249,6 +251,7 @@ void XCrawler::fetch()
                     }
 
                     pState->iState = 0;
+                    pState->iLast = 0;
                     memcpy(pState->base, sUrl.c_str(), sUrl.size());
                     pState->iLen = sUrl.size();
 
@@ -259,46 +262,78 @@ void XCrawler::fetch()
             } 
         }
 
+        usleep(100000);
+
     } //end while
 }
 
-int XCrawler::get_response(int iFd, char *pHtmlBody, int *pHtmlSize) {
+int XCrawler::is_valid_html(char *pHtml, int iSize) {
+    char *pCLpos;
+    pHtml[iSize] = '\0';
+    if ((pCLpos = strstr(pHtml, "Content-Length: ")) == NULL) {
+        return -1;
+    }
+
+    int iContentLen = atoi(pCLpos + strlen("Content-Length: "));
+    printf("Content-Length: %d\n", iContentLen);
+
+
+    char *pCRLF = strstr(pHtml, "\r\n\r\n");
+    if (pCRLF == NULL) {
+        return -1;
+    }
+
+    int iTrueLen = pCRLF - pHtml + strlen("\r\n\r\n") + iContentLen;
+
+    if (iSize < iTrueLen) {
+        return -1;
+    }
+
+    if (iSize > iTrueLen) {
+        log_err("iSize = %d, iTrueLen = %d", iSize, iTrueLen);
+    }
+    return 0;
+}
+
+int XCrawler::get_response(CrawlerState *pState) {
+    int iFd = pState->iFd;
+    int iLast = pState->iLast;
     int iRet = 0;
-    int last = 0, nRead = 0;
+    int nRead = 0;
     while (1) {
-        nRead = read(iFd, pHtmlBody+last, *pHtmlSize-last);
+        nRead = read(iFd, pState->htmlBody + iLast, HTMLSIZE - iLast);
 
         if (nRead == 0) {
             // EOF
-            close(iFd);
-            curConns--;
-            *pHtmlSize = last;
             log_err("EOF");
-
-            return -1;
+            goto err;
         }
 
         if (nRead < 0) {
             if (errno != EAGAIN) {
                 log_err("read err, and errno = %d", errno);
-                iRet = -1;
-                close(iFd);
-                curConns--;
+                goto err;
             }
 
             break;
         }
         
-        last += nRead;
+        iLast += nRead;
     }
 
-    *pHtmlSize = last;
+    pState->iLast = iLast;
+
     return iRet;
+
+err:
+    close(iFd);
+    free(pState);
+    curConns--;
+    return -1;
 }
 
 int XCrawler::fetch_url(string &sUrl) {
     int iRet = 0;
-    Url url;
     int i;
 
     while (1) {
@@ -312,19 +347,11 @@ int XCrawler::fetch_url(string &sUrl) {
         sUrl = unvisitedUrl.front();
         unvisitedUrl.pop();
 
-        CMD5 urlDigest;
-        urlDigest.GenerateMD5((unsigned char*)sUrl.c_str(), sUrl.length());
-        if (visitedUrlMd5.find(urlDigest.getResult()) != visitedUrlMd5.end()) {
-            continue;
-        }
-
-        visitedUrlMd5.insert(urlDigest.getResult());
-        url.parse(sUrl);
 
         break;
     }
 
-    log_info("fetch success! url = %s", url.getUrl().c_str());
+    log_info("fetch success! url = %s", sUrl.c_str());
     return 0;
 }
 
@@ -399,10 +426,12 @@ int XCrawler::prepare_get_followers_request(char *pReq, int *pSize, string &sUrl
             "Cache-Control: max-age=0\r\n"
             "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
             "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36\r\n"
+            "Referer: %s\r\n"
             "Accept-Language: zh-CN,zh;q=0.8\r\n"
             "Cookie: %s\r\n"
-            "\r\n", url.getPath().c_str(), cookie.c_str());
+            "\r\n", url.getPath().c_str(), sUrl.c_str(), cookie.c_str());
 
+    //printf("header=\n%.*s\n", iRet, pReq);
     if (iRet < 0) {
         log_err("snprintf");
         return iRet;
@@ -455,6 +484,12 @@ int XCrawler::make_socket_non_blocking(int fd) {
 void XCrawler::push_urls(vector<string> &vFollows) {
     vector<string>::iterator it;
     for (it = vFollows.begin(); it != vFollows.end(); it++) {
+
+        if (visitedUrl.find(*it) != visitedUrl.end()) {
+            continue;
+        }
+
+        visitedUrl.insert(*it);
         unvisitedUrl.push(*it);
     }
 }
