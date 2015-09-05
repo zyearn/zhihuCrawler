@@ -92,15 +92,15 @@ void XCrawler::fetch()
 
         do {
             if (curConns < MAXCONNS) {
-                iRet = make_connection(&iFd);
-                if (iRet < 0) {
-                    log_err("and_make_connection");
-                    break;
-                }
-
                 iRet = fetch_url(sUrl);
                 if (iRet < 0) {
                     log_err("fetch_url");
+                    break;
+                }
+
+                iRet = make_connection(&iFd);
+                if (iRet < 0) {
+                    log_err("and_make_connection");
                     break;
                 }
                 
@@ -161,12 +161,29 @@ void XCrawler::fetch()
 
                     Parse::SearchAnswer(pState->htmlBody, pState->iLast, fResultOut);
 
-                    // add followers link to queue
+                    Parse::GetFollowCount(pState->htmlBody, pState->iLast, &(pState->iFolloweeCount), &(pState->iFollowerCount));
+
+                    Parse::GetHashId(pState->htmlBody, pState->iLast, pState->hashId, &(pState->iHashIdSize));
+
+                    Parse::GetXsrf(pState->htmlBody, pState->iLast, pState->xsrf, &(pState->iXsrfSize));
+
+                    // how many request needed
+                    pState->iFolloweeCount += (USERSPERREQ - 1);
+                    pState->iFolloweeCount /= USERSPERREQ;
+                    pState->iFolloweeCur = 0;
+
+                    pState->iFollowerCount += (USERSPERREQ - 1);
+                    pState->iFollowerCount /= USERSPERREQ;
+                    pState->iFollowerCur = 0;
+
+                    log_info("ee = %d, er = %d", pState->iFolloweeCount, pState->iFollowerCount);
+
                     pState->iState++;
                     pState->iLast = 0;
                     sUrl = string(pState->base, pState->iLen);
 
-                    iRet = prepare_get_followers_request(reqBuf, &iHeaderSize, sUrl);
+                    // add followers link to queue
+                    iRet = prepare_get_followers_request(reqBuf, &iHeaderSize, sUrl, pState->iFollowerCur * USERSPERREQ, pState);
                     if (iRet < 0) {
                         log_err("prepare_get_followers_request");
                         continue;
@@ -178,22 +195,70 @@ void XCrawler::fetch()
                         continue;
                     }
 
+                    pState->iFollowerCur++;
+
                     break;
 
                 case 1:
                     iRet = get_response(pState);
                     if (iRet < 0) {
                         log_err("get_response");
-                        continue;
-                    }
 
-                    iRet = is_valid_html(pState->htmlBody, pState->iLast);
-                    if (iRet != 0) {
-                        break;
+                        if (iRet == EEOF) {
+                            iRet = make_connection(&(pState->iFd));
+                            if (iRet < 0) {
+                                log_err("and_make_connection");
+                                break;
+                            }
+
+                            log_info("make connection suc!");
+                            struct epoll_event event;
+                            event.data.ptr = (void *)pState;
+                            event.events = EPOLLIN | EPOLLET;
+
+                            iRet = epoll_ctl(epfd, EPOLL_CTL_ADD, pState->iFd, &event);
+                            check(iRet == 0, "epoll_add");
+
+                            curConns++;
+                        } else {
+                            break;
+                        }
+                    } else {
+
+                        iRet = is_valid_html(pState->htmlBody, pState->iLast);
+                        if (iRet != 0) {
+                            break;
+                        }
+
                     }
 
                     Parse::SearchFollowers(pState->htmlBody, pState->iLast, vFollows);
+                    if (pState->iFollowerCur != pState->iFollowerCount) {
+                        // more followers! need get followers again
+                        log_info("more followers! need get followers again cur = %d, target = %d", pState->iFollowerCur, pState->iFollowerCount);
+                        sUrl = string(pState->base, pState->iLen);
 
+                        iHeaderSize = HTMLSIZE;
+                        iRet = prepare_get_followers_request(reqBuf, &iHeaderSize, sUrl, pState->iFollowerCur * USERSPERREQ, pState);
+                        if (iRet < 0) {
+                            log_err("prepare_get_followers_request");
+                            continue;
+                        }
+                        
+                        iRet = write(pState->iFd, reqBuf, iHeaderSize);
+                        if (iRet < 0) {
+                            log_err("write");
+                            continue;
+                        }
+
+                        pState->iFollowerCur++;
+                        pState->iLast = 0;
+                        log_info("send get follower succ!");
+                    } else {
+                        log_info("complete!! get all followers of %.*s", pState->iLen, pState->base);
+                    }
+
+                    /*
                     push_urls(vFollows);
 
                     // add followees link to queue
@@ -213,6 +278,7 @@ void XCrawler::fetch()
                         continue;
                     }
 
+                    */
                     break;
 
                 case 2:
@@ -262,7 +328,7 @@ void XCrawler::fetch()
             } 
         }
 
-        usleep(100000);
+        //usleep(100000);
 
     } //end while
 }
@@ -300,13 +366,18 @@ int XCrawler::get_response(CrawlerState *pState) {
     int iLast = pState->iLast;
     int iRet = 0;
     int nRead = 0;
+    int first = 1;
     while (1) {
         nRead = read(iFd, pState->htmlBody + iLast, HTMLSIZE - iLast);
 
         if (nRead == 0) {
             // EOF
+            if (first) log_info("first loop read EOF");
+            else  log_info("not first loop rend EOF");
             log_err("EOF");
-            goto err;
+            close(iFd);
+            curConns--;
+            return EEOF;
         }
 
         if (nRead < 0) {
@@ -319,6 +390,7 @@ int XCrawler::get_response(CrawlerState *pState) {
         }
         
         iLast += nRead;
+        first = 0;
     }
 
     pState->iLast = iLast;
@@ -327,7 +399,7 @@ int XCrawler::get_response(CrawlerState *pState) {
 
 err:
     close(iFd);
-    free(pState);
+    //free(pState);
     curConns--;
     return -1;
 }
@@ -416,26 +488,64 @@ int XCrawler::prepare_get_answer_request(char *pReq, int *pSize, string &sUrl) {
     return 0;
 }
 
-int XCrawler::prepare_get_followers_request(char *pReq, int *pSize, string &sUrl) {
+int XCrawler::prepare_get_followers_request(char *pReq, int *pSize, string &sUrl, int iCur, CrawlerState *pState) {
+    ostringstream oss; 
     Url url(sUrl);
     int iRet = 0;
+    string hashId(pState->hashId, pState->iHashIdSize);
+    string _xsrf(pState->xsrf, pState->iXsrfSize);
+
+    oss << "{\"offset\":" << iCur << ",\"order_by\":\"created\",\"hash_id\":\"" << hashId << "\"}";
+    string sParams = oss.str();
+    char postBody[MAXLINE];
+
+    iRet = snprintf(postBody, MAXLINE, 
+            "method=next&params=%s&_xsrf=%s",
+            Url::encode(sParams).c_str(), _xsrf.c_str()
+            );
+
+    if (iRet < 0) {
+        log_err("snprintf postBody");
+        return iRet;
+    }
+    
+    int iContentLen = iRet;
+    postBody[iContentLen] = '\0';
+
+    //iRet = snprintf(pReq, *pSize,
+    //        "GET %s/followers HTTP/1.1\r\n"
+    //        "Host: www.zhihu.com\r\n"
+    //        "Connection: keep-alive\r\n"
+    //        "Cache-Control: max-age=0\r\n"
+    //        "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
+    //        "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36\r\n"
+    //        "Referer: %s\r\n"
+    //        "Accept-Language: zh-CN,zh;q=0.8\r\n"
+    //        "Cookie: %s\r\n"
+    //        "\r\n", url.getPath().c_str(), sUrl.c_str(), cookie.c_str());
     iRet = snprintf(pReq, *pSize,
-            "GET %s/followers HTTP/1.1\r\n"
+            "POST /node/ProfileFollowersListV2 HTTP/1.1\r\n"
             "Host: www.zhihu.com\r\n"
             "Connection: keep-alive\r\n"
-            "Cache-Control: max-age=0\r\n"
-            "Accept: text/html,application/xhtml+xml,application/xml;q=0.9,image/webp,*/*;q=0.8\r\n"
+            "Content-Length: %d\r\n"
+            "Accept: */*\r\n"
+            "Origin: http://www.zhihu.com\r\n"
+            "X-Requested-With: XMLHttpRequest\r\n"
             "User-Agent: Mozilla/5.0 (Macintosh; Intel Mac OS X 10_10_5) AppleWebKit/537.36 (KHTML, like Gecko) Chrome/44.0.2403.157 Safari/537.36\r\n"
-            "Referer: %s\r\n"
+            "Content-Type: application/x-www-form-urlencoded; charset=UTF-8\r\n"
+            "Referer: %s/followers\r\n"
             "Accept-Language: zh-CN,zh;q=0.8\r\n"
             "Cookie: %s\r\n"
-            "\r\n", url.getPath().c_str(), sUrl.c_str(), cookie.c_str());
-
-    //printf("header=\n%.*s\n", iRet, pReq);
+            "\r\n"
+            "%s",
+            iContentLen, sUrl.c_str(), cookie.c_str(), postBody
+            );
     if (iRet < 0) {
         log_err("snprintf");
         return iRet;
     }
+
+    printf("post followers:\n%.*s", iRet, pReq);
 
     *pSize = iRet;
     return 0;
@@ -463,6 +573,7 @@ int XCrawler::prepare_get_followees_request(char *pReq, int *pSize, string &sUrl
     *pSize = iRet;
     return 0;
 }
+
 int XCrawler::make_socket_non_blocking(int fd) {
     int flags, s;
     flags = fcntl(fd, F_GETFL, 0);

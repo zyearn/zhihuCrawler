@@ -3,6 +3,7 @@
 
 #include <iostream>
 #include <fstream>
+#include <sstream>
 #include <set>
 #include <vector>
 #include <queue>
@@ -28,12 +29,18 @@
 #include "dbg.h"
 
 #define MAXEVENTS   1024
-#define MAXCONNS    500
+#define MAXCONNS    2
 #define MAXLINE     2048
 #define SMALLLINE   64
+#define LINESIZE    256
 #define HTMLSIZE    524288
 
 #define EPOLLTIMEOUT    1000    //1s
+
+// how many users returned by requesting followee/er ajax
+#define USERSPERREQ      20
+
+#define EEOF        -10
 
 using namespace std;
 
@@ -58,7 +65,21 @@ private:
         int iLen;
         char htmlBody[HTMLSIZE];
         int iLast;
+        
+        // need iFolloweeCount times request
+        int iFolloweeCount;
+        int iFolloweeCur;
+
+        int iFollowerCount;
+        int iFollowerCur;
+
+        // hash_id and _xrsf for ajax
+        char hashId[LINESIZE];
+        int iHashIdSize;
+        char xsrf[LINESIZE];
+        int iXsrfSize;
     };
+
 private:
     void init();
     void init_epoll();
@@ -67,7 +88,7 @@ private:
     int fetch_url(string &sUrl);
     int make_connection(int *pFd);
     int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
-    int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl, int iCur, CrawlerState *pState);
     int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl);
     int get_response(CrawlerState *pState);
     int make_socket_non_blocking(int fd);

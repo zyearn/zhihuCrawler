@@ -1,4 +1,5 @@
 #include "Url.h"
+using namespace std;
 
 Url::Url(const string &url): m_url(url) {
     parse(url);
@@ -45,4 +46,26 @@ string Url::getHost()
 string Url::getPath()
 {
 	return m_path;
+}
+
+
+string Url::encode(const string &value) {
+    ostringstream escaped;
+    escaped.fill('0');
+    escaped << hex;
+
+    for (string::const_iterator i = value.begin(), n = value.end(); i != n; ++i) {
+        string::value_type c = (*i);
+
+        // Keep alphanumeric and other accepted characters intact
+        if (isalnum(c) || c == '-' || c == '_' || c == '.' || c == '~') {
+            escaped << c;
+            continue;
+        }
+
+        // Any other characters are percent-encoded
+        escaped << '%' << setw(2) << int((unsigned char) c);
+    }
+
+    return escaped.str();
 }

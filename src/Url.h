@@ -2,6 +2,9 @@
 #define _URL_H
 
 #include <string>
+#include <cctype>
+#include <iomanip>
+#include <sstream>
 #include "dbg.h"
 
 #define HTTPPROT    "http://"
@@ -27,6 +30,8 @@ public:
     string getHost();
 
     string getPath();
+
+    static string encode(const string &value);
 
 private:
     string m_url;
