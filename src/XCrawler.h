@@ -29,7 +29,7 @@
 #include "dbg.h"
 
 #define MAXEVENTS   1024
-#define MAXCONNS    2
+#define MAXCONNS    500
 #define MAXLINE     2048
 #define SMALLLINE   64
 #define LINESIZE    256
@@ -89,7 +89,7 @@ private:
     int make_connection(int *pFd);
     int prepare_get_answer_request(char *pReq, int *pSize, string &sUrl);
     int prepare_get_followers_request(char *pReq, int *pSize, string &sUrl, int iCur, CrawlerState *pState);
-    int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl);
+    int prepare_get_followees_request(char *pReq, int *pSize, string &sUrl, int iCur, CrawlerState *pState);
     int get_response(CrawlerState *pState);
     int make_socket_non_blocking(int fd);
     void push_urls(vector<string> &vFollows);

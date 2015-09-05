@@ -26,7 +26,7 @@ int Parse::SearchAnswer(char *pContent, int iLen, ofstream &out) {
         votecount_pos = countString.find("data-votecount");
 
         cur_count = atoi(countString.c_str() + votecount_pos + strlen("data-votecount") + 2);
-        log_info("find count %d", cur_count);
+        //log_info("find count %d", cur_count);
 
         body[pos] = '\0';
         string tmpbody(body.c_str());
@@ -60,7 +60,7 @@ int Parse::SearchAnswer(char *pContent, int iLen, ofstream &out) {
 }
 
 int Parse::SearchFollowers(char *pContent, int iLen, vector<string> &vFollow) {
-    cout << "in the SearchFollowers, contentLen = " << iLen << endl;
+    //cout << "in the SearchFollowers, contentLen = " << iLen << endl;
     string body = string(pContent, iLen);
     fBodyOut << "Bodyout: " << body << endl;
     string::size_type pos, start, end;
@@ -81,13 +81,13 @@ int Parse::SearchFollowers(char *pContent, int iLen, vector<string> &vFollow) {
         }
 
         follower = RemoveEscape(body.substr(start, end - start));
-        log_info("find follower!! %s", follower.c_str());
+        log_info("find follow*!! %s", follower.c_str());
 
         body = body.substr(end + 1);
         vFollow.push_back(follower);
     }
 
-    cout << "leave SearchFollowers" << endl;
+    //cout << "leave SearchFollowers" << endl;
     return 0;
 }
 
@@ -122,6 +122,8 @@ int Parse::GetFollowCount(char *pContent, int iLen, int *pFollowee, int *pFollow
     
     } else {
         log_err("fatal err: can not find followee/er");
+        *pFollowee = 0;
+        *pFollower = 0;
         return -1;
     }
 
@@ -158,7 +160,7 @@ int Parse::GetXsrf(char *pContent, int iLen, char *pXsrf, int *pXsrfSize) {
         memcpy(pXsrf, result.c_str(), result.size());
         *pXsrfSize = result.size();
     } else {
-        log_err("can not find hash id");
+        log_err("can not find _xsrf");
         return -1;
     }
 
