@@ -82,22 +82,22 @@ void *WebServer::startWebServer(void *arg) {
 
 int WebServer::sendHtml(int sock)
 {
-	struct timeval nowtv;
-	char cnowtv[100];
-	gettimeofday(&nowtv,NULL);
-	sprintf(cnowtv,"%ld",nowtv.tv_sec-startTime.tv_sec);
+    struct timeval nowtv;
+    char cnowtv[100];
+    gettimeofday(&nowtv,NULL);
+    sprintf(cnowtv,"%ld",nowtv.tv_sec-startTime.tv_sec);
 
-	char cPeopleNum[100];
-	sprintf(cPeopleNum, "%zu", unvisitedUrl.size());
+    char cPeopleNum[100];
+    sprintf(cPeopleNum, "%zu", unvisitedUrl.size());
 
     
-	const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p> send queue has " + string(cPeopleNum) + " people.</body></html>";
+    const string body="<html>\n<head><title>zhihuCrawler real time stat</title></head><body><p>"+string(cnowtv)+" seconds</p> send queue has " + string(cPeopleNum) + " people.</body></html>";
 
     char num[100];
     sprintf(num, "%lu", body.length());
     const std::string header="HTTP/1.0 200 OK\r\nServer: ZhihuCrawler\r\nContent-Type: text/html\r\nContent-Length: " + string(num) + "\r\n\r\n";
     if (send(sock, header.c_str(),header.length(),0) < 0 ||
-	        send(sock,body.c_str(),body.length(),0) < 0) 
+            send(sock,body.c_str(),body.length(),0) < 0) 
     {
         fprintf(stderr, "error: send\n");
         return -1;

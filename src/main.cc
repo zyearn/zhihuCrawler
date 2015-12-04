@@ -15,8 +15,8 @@ int main(int argc, char *argv[])
     WebServer server;
     server.run();
 
-	XCrawler crawler;
-	crawler.start();
+    XCrawler crawler;
+    crawler.start();
 
-	return 0;
+    return 0;
 }

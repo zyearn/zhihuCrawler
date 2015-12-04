@@ -34,7 +34,7 @@ public:
     string getIP(const string &host);
 private:
     bool isValidHostChar(char ch);
-    bool isValidHost(const char *host);	
+    bool isValidHost(const char *host); 
 
     /*
      * check if the ip is in the range of what we want
