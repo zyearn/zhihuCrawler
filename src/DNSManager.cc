@@ -7,7 +7,7 @@ DNSManager::DNSManager() {
 DNSManager::~DNSManager() {
 
 }
-j
+
 bool DNSManager::isValidHostChar(char ch)
 {
     return (isalpha(ch) || isdigit(ch)
