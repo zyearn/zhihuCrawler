@@ -34,6 +34,6 @@ ZhihuCrawler是用C++编写的高效、基于事件驱动的知乎爬虫，目�
 
 ## 更多
 
-更多详情请访问 http://lifeofzjs.com/blog/2015/09/09/how-to-write-a-event-based-crawler-using-c/
+更多详情请访问 http://zyearn.github.io/blog/2015/09/09/how-to-write-a-event-based-crawler-using-c/
 
 // 用C/C++写爬虫真是做大死
